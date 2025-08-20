@@ -31,7 +31,7 @@ class DisplayController extends Controller
                 'mrn'     => '',
                 'conDr'   => '',
                 'regDr'   => '',
-                'sts'     => '',
+                'sts'     => '1',
                 'proc'    => '',
                 'ic'      => '',
                 'cath'    => '',

@@ -76,12 +76,12 @@
 <template>
   <div class="min-h-screen bg-slate-200 p-6">
     <!-- Header -->
-    <div class="max-w-10xl mx-auto bg-fuchsia-300 shadow-lg rounded-lg p-6 mb-8 flex items-center justify-between h-20">
+    <div class="max-w-10xl mx-auto bg-gradient-to-r from-violet-600 to-zinc-50 shadow-lg rounded-lg p-6 mb-8 flex items-center justify-between h-20">
       
       <!-- Left: Clock & Date -->
       <div class="flex flex-col text-left leading-tight">
-        <span class="text-xl font-bold">{{ time }}</span>
-        <span class="text-sm">{{ date }}</span>
+        <span class="text-xl font-bold text-white">{{ time }}</span>
+        <span class="text-sm text-white">{{ date }}</span>
       </div>
 
       <!-- Center: Title -->
