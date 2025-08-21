@@ -32,7 +32,15 @@
   const fetchData = async () => {
     try {
       const response = await axios.get(route('display.geticllisting'))
-      iclData.value = response.data.data
+      iclData.value = response.data.data.sort((a, b) => {
+        // Put null/empty cathRegNo at the bottom
+        if (!a.cathRegNo && !b.cathRegNo) return 0
+        if (!a.cathRegNo) return 1
+        if (!b.cathRegNo) return -1
+
+        // Normal ascending sort
+        return a.cathRegNo.localeCompare(b.cathRegNo, undefined, { numeric: true })
+      })
 
       // Optional safety check if current page exceeds new data length
       if ((currentPage.value - 1) * itemsPerPage >= iclData.value.length) {
@@ -42,6 +50,7 @@
       console.error('Error fetching ICL data:', error)
     }
   }
+
 
   // Computed paginated data
   const paginatedData = computed(() => {
