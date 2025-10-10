@@ -8,7 +8,7 @@
 	// Data state
 	const iclData = ref([])
 	const currentPage = ref(1)
-	const itemsPerPage = 13
+	const itemsPerPage = 15
 
 	// Clock state
 	const time = ref('')
