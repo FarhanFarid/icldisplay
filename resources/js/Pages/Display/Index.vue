@@ -1,172 +1,215 @@
 <script setup>
-  import { ref, onMounted, computed, onBeforeUnmount } from 'vue'
-  import axios from 'axios'
-  import { route } from 'ziggy-js'
-  import flagshiplogo from '@/Media/logo/ijnflagship.png'
-  import mislogo from '@/Media/logo/Logo MIS-01.png'
+	import { ref, onMounted, computed, onBeforeUnmount } from 'vue'
+	import axios from 'axios'
+	import { route } from 'ziggy-js'
+	import flagshiplogo from '@/Media/logo/ijnflagship.png'
+	import mislogo from '@/Media/logo/Logo MIS-01.png'
 
-  // Data state
-  const iclData = ref([])
-  const currentPage = ref(1)
-  const itemsPerPage = 13
+	// Data state
+	const iclData = ref([])
+	const currentPage = ref(1)
+	const itemsPerPage = 13
 
-  // Clock state
-  const time = ref('')
-  const date = ref('')
+	// Clock state
+	const time = ref('')
+	const date = ref('')
 
-  function updateClock() {
-    const now = new Date()
-    time.value = now.toLocaleTimeString('en-GB', { hour12: false })
-    date.value = now.toLocaleDateString('en-GB', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    })
-  }
+	function updateClock() {
+		const now = new Date()
+		time.value = now.toLocaleTimeString('en-GB', { hour12: false })
+		date.value = now.toLocaleDateString('en-GB', {
+			weekday: 'long',
+			day: 'numeric',
+			month: 'long',
+			year: 'numeric'
+		})
+	}
 
-  let clockInterval = null
-  let fetchInterval = null
+	let clockInterval = null
+	let fetchInterval = null
+	let carouselInterval = null // <— for auto page change
 
-  // Fetch ICL listing
-  const fetchData = async () => {
-    try {
-      const response = await axios.get(route('display.geticllisting'))
-      iclData.value = response.data.data.sort((a, b) => {
-        // Put null/empty cathRegNo at the bottom
-        if (!a.cathRegNo && !b.cathRegNo) return 0
-        if (!a.cathRegNo) return 1
-        if (!b.cathRegNo) return -1
+	// Fetch ICL listing
+	const fetchData = async () => {
+		try {
+			const response = await axios.get(route('display.geticllisting'))
+			iclData.value = response.data.data.sort((a, b) => {
+			const parseTime = (t) => {
+				if (!t) return null
+				const [hours, minutes] = t.split(':').map(Number)
+				return hours * 60 + minutes
+			}
+			const timeA = parseTime(a.timeIn)
+			const timeB = parseTime(b.timeIn)
 
-        // Normal ascending sort
-        return a.cathRegNo.localeCompare(b.cathRegNo, undefined, { numeric: true })
-      })
+			if (timeA === null && timeB === null) return 0
+			if (timeA === null) return 1
+			if (timeB === null) return -1
+			return timeB - timeA
+			})
 
-      // Optional safety check if current page exceeds new data length
-      if ((currentPage.value - 1) * itemsPerPage >= iclData.value.length) {
-        currentPage.value = 1
-      }
-    } catch (error) {
-      console.error('Error fetching ICL data:', error)
-    }
-  }
+			if ((currentPage.value - 1) * itemsPerPage >= iclData.value.length) {
+			currentPage.value = 1
+			}
+		} catch (error) {
+			console.error('Error fetching ICL data:', error)
+		}
+	}
 
+	// Computed paginated data
+	const paginatedData = computed(() => {
+		const start = (currentPage.value - 1) * itemsPerPage
+		return iclData.value.slice(start, start + itemsPerPage)
+	})
 
-  // Computed paginated data
-  const paginatedData = computed(() => {
-    const start = (currentPage.value - 1) * itemsPerPage
-    return iclData.value.slice(start, start + itemsPerPage)
-  })
+	// Total number of pages
+	const totalPages = computed(() => {
+		return Math.ceil(iclData.value.length / itemsPerPage)
+	})
 
-  // Auto-slide every 10 seconds
-  const startCarousel = () => {
-    setInterval(() => {
-      if (currentPage.value * itemsPerPage >= iclData.value.length) {
-        currentPage.value = 1
-      } else {
-        currentPage.value++
-      }
-    }, 10000)
-  }
+	// Manual navigation functions
+	const nextPage = () => {
+		if (currentPage.value < totalPages.value) {
+			currentPage.value++
+		} else {
+			currentPage.value = 1
+		}
+		resetCarousel() // reset auto timer
+	}
 
-  // Lifecycle
-  onMounted(() => {
-    fetchData().then(startCarousel)
-    clockInterval = setInterval(updateClock, 1000) // update clock every second
-    fetchInterval = setInterval(fetchData, 30000) // refresh API every 30s
-  })
+	const prevPage = () => {
+		if (currentPage.value > 1) {
+			currentPage.value--
+		} else {
+			currentPage.value = totalPages.value
+		}
+		resetCarousel()
+	}
 
-  onBeforeUnmount(() => {
-    clearInterval(clockInterval)
-    clearInterval(fetchInterval)
-  })
+	// Auto-slide every 10 seconds
+	const startCarousel = () => {
+		carouselInterval = setInterval(() => {
+			nextPage()
+		}, 10000)
+	}
+
+	// Reset timer when manually clicked
+	const resetCarousel = () => {
+		clearInterval(carouselInterval)
+		startCarousel()
+	}
+
+	// Lifecycle
+	onMounted(() => {
+		fetchData().then(startCarousel)
+		clockInterval = setInterval(updateClock, 1000)
+		fetchInterval = setInterval(fetchData, 30000)
+	})
+
+	onBeforeUnmount(() => {
+		clearInterval(clockInterval)
+		clearInterval(fetchInterval)
+		clearInterval(carouselInterval)
+	})
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-200 p-6">
-    <!-- Header -->
-    <div class="max-w-10xl mx-auto bg-gradient-to-r from-violet-600 to-zinc-50 shadow-lg rounded-lg p-6 mb-8 flex items-center justify-between h-20">
-      
-      <!-- Left: Clock & Date -->
-      <div class="flex flex-col text-left leading-tight">
-        <span class="text-xl font-bold text-white">{{ time }}</span>
-        <span class="text-sm text-white">{{ date }}</span>
-      </div>
-
-      <!-- Center: Title -->
-      <h1 class="text-4xl font-black text-dark pl-40"> ICL Display </h1>
-      <!-- Right: Logos -->
-      <div class="flex gap-2">
-        <img :src="flagshiplogo" alt="Logo" class="h-20 object-contain"/>
-        <img :src="mislogo" alt="Logo" class="h-18 object-contain"/>
-      </div>
-    </div>
-
-    <!-- Table Container -->
-    <div class="max-w-10xl mx-auto bg-fuchsia-50 shadow-lg rounded-lg p-6">
-      <!-- <h2 class="text-xl font-semibold text-gray-700 mb-4 text-center">Data Listing</h2> -->
-
-      <table class="min-w-full border border-gray-200">
-        <thead class="bg-slate-200 text-center text-xl">
-          <tr>
-            <th class="px-4 py-2 border-b">MRN</th>
-            <th class="px-4 py-2 border-b">PROCEDURE</th>
-            <th class="px-4 py-2 border-b">CONSULTANT</th>
-            <th class="px-4 py-2 border-b">REG NO.</th>
-            <th class="px-4 py-2 border-b">LAB</th>
-            <th class="px-4 py-2 border-b">TIME IN</th>
-            <th class="px-4 py-2 border-b">STATUS</th>
-          </tr>
-        </thead>
-
-        <!-- Transition effect for page change -->
-        <transition name="fade" mode="out-in">
-          <tbody class="text-center" :key="currentPage">
-            <tr v-for="(item, index) in paginatedData" :key="index" class="odd:bg-white even:bg-slate-100">
-              <td class="px-4 py-2 border-b font-semibold text-xl">{{ item.mrn || '-' }}</td>
-              <td class="px-4 py-2 border-b text-xl">{{ item.initialProcedure || '-' }}</td>
-              <td class="px-4 py-2 border-b text-xl">{{ item.consultant || '-' }}</td>
-              <td class="px-4 py-2 border-b text-xl">{{ item.cathRegNo || '-' }}</td>
-              <td class="px-4 py-2 border-b text-xl">{{ item.lab || '-' }}</td>
-              <td class="px-4 py-2 border-b text-xl">{{ item.timeIn || '-' }}</td>
-              <td class="px-4 py-2 border-b text-xl">
-                <span
-                  v-if="item.status"
-                  :class="[
-                    'px-2 py-1 rounded-full text-dark text-sm font-semibold',
-                    item.status === 'Initial'
-                      ? 'bg-yellow-500'
-                      : item.status === 'Done'
-                      ? 'bg-green-500'
-                      : item.status === 'Postpone'
-                      ? 'bg-red-500'
-                      : 'bg-gray-400']">
-                  {{ item.status }}
-                </span>
-                <span v-else>-</span>
-              </td>            
-            </tr>
-            <tr v-if="paginatedData.length === 0">
-              <td colspan="7" class="px-4 py-2 border-b text-center">No data found</td>
-            </tr>
-          </tbody>
-        </transition>
-      </table>
-    </div>
-  </div>
+	<div class="relative min-h-screen bg-slate-200 p-6 overflow-hidden">
+		<!-- Left/Right full-height navigation zones -->
+		<div 
+			class="absolute top-0 left-0 h-full w-1/6 bg-transparent hover:bg-gray-300/10 cursor-pointer z-20 flex items-center justify-start group"
+			@click="prevPage"
+			title="Previous Page">
+			<span class="text-gray-400 text-5xl opacity-0 group-hover:opacity-70 pl-4 transition-opacity duration-300">←</span>
+		</div>
+  
+		<div 
+			class="absolute top-0 right-0 h-full w-1/6 bg-transparent hover:bg-gray-300/10 cursor-pointer z-20 flex items-center justify-end group"
+			@click="nextPage"
+			title="Next Page">
+			<span class="text-gray-400 text-5xl opacity-0 group-hover:opacity-70 pr-4 transition-opacity duration-300">→</span>
+		</div>
+  
+		<!-- Header -->
+		<div class="max-w-10xl mx-auto bg-gradient-to-r from-violet-600 to-zinc-50 shadow-lg rounded-lg p-6 mb-8 flex items-center justify-between h-20 relative z-10">
+			<div class="flex flex-col text-left leading-tight">
+				<span class="text-xl font-bold text-white">{{ time }}</span>
+				<span class="text-sm text-white">{{ date }}</span>
+			</div>
+			<h1 class="text-4xl font-black text-dark pl-40">ICL Display</h1>
+			<div class="flex gap-2">
+				<img :src="flagshiplogo" alt="Logo" class="h-20 object-contain" />
+				<img :src="mislogo" alt="Logo" class="h-18 object-contain" />
+			</div>
+		</div>
+  
+		<!-- Table Container -->
+		<div class="max-w-10xl mx-auto bg-fuchsia-50 shadow-lg rounded-lg p-6 overflow-hidden relative z-10">
+				<table class="min-w-full border border-gray-200">
+					<thead class="bg-slate-200 text-center text-xl">
+						<tr>
+						<th class="px-4 py-2 border-b">No.</th>
+						<th class="px-4 py-2 border-b">MRN</th>
+						<th class="px-4 py-2 border-b">PROCEDURE</th>
+						<th class="px-4 py-2 border-b">CONSULTANT</th>
+						<th class="px-4 py-2 border-b">REG NO.</th>
+						<th class="px-4 py-2 border-b">LAB</th>
+						<th class="px-4 py-2 border-b">TIME IN</th>
+						<th class="px-4 py-2 border-b">STATUS</th>
+						</tr>
+					</thead>
+	
+				<transition name="fade" mode="out-in">
+					<tbody class="text-center" :key="currentPage">
+						<tr v-for="(item, index) in paginatedData" :key="index" class="odd:bg-white even:bg-slate-100">
+							<td class="px-4 py-2 border-b font-semibold text-xl">
+							{{ (currentPage - 1) * itemsPerPage + index + 1 }}
+							</td>
+							<td class="px-4 py-2 border-b font-semibold text-xl">{{ item.mrn || '-' }}</td>
+							<td class="px-4 py-2 border-b text-xl">{{ item.initialProcedure || '-' }}</td>
+							<td class="px-4 py-2 border-b text-xl">{{ item.consultant || '-' }}</td>
+							<td class="px-4 py-2 border-b text-xl">{{ item.cathRegNo || '-' }}</td>
+							<td class="px-4 py-2 border-b text-xl">{{ item.lab || '-' }}</td>
+							<td class="px-4 py-2 border-b text-xl">{{ item.timeIn || '-' }}</td>
+							<td class="px-4 py-2 border-b text-xl">
+								<span
+									v-if="item.status"
+									:class="[ 
+									'px-2 py-1 rounded-full text-dark text-sm font-semibold',
+									item.status === 'Initial'
+										? 'bg-yellow-500'
+										: item.status === 'Done'
+										? 'bg-green-500'
+										: item.status === 'Postpone'
+										? 'bg-red-500'
+										: 'bg-gray-400'
+									]">
+									{{ item.status }}
+								</span>
+								<span v-else>-</span>
+							</td>
+						</tr>
+						<tr v-if="paginatedData.length === 0">
+							<td colspan="8" class="px-4 py-2 border-b text-center">No data found</td>
+						</tr>
+					</tbody>
+				</transition>
+			</table>
+	
+			<!-- Page indicator -->
+			<div class="text-center mt-4 text-lg font-semibold text-gray-700">
+				Page {{ currentPage }} / {{ totalPages }}
+			</div>
+		</div>
+	</div>
 </template>
+  
 
 <style scoped>
-/* Fade effect */
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.5s ease;
-}
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
-}
-
-.outlined-title {
-  -webkit-text-stroke: 2px rgb(255, 255, 255);
-}
-
+	.fade-enter-active, .fade-leave-active {
+		transition: opacity 0.5s ease;
+	}
+	.fade-enter-from, .fade-leave-to {
+		opacity: 0;
+	}
 </style>
