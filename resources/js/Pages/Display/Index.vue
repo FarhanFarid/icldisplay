@@ -10,6 +10,19 @@
 	const currentPage = ref(1)
 	const itemsPerPage = 15
 
+	const counter = ref({
+		initial: 0,
+		ongoing: 0,
+		done: 0
+	})
+
+	const statusPriority = {
+		'Initial': 1,
+		'initial': 1,
+		'Done': 3,
+		'done': 3
+	}
+
 	// Clock state
 	const time = ref('')
 	const date = ref('')
@@ -33,28 +46,62 @@
 	const fetchData = async () => {
 		try {
 			const response = await axios.get(route('display.geticllisting'))
-			iclData.value = response.data.data.sort((a, b) => {
-			const parseTime = (t) => {
-				if (!t) return null
-				const [hours, minutes] = t.split(':').map(Number)
-				return hours * 60 + minutes
-			}
-			const timeA = parseTime(a.timeIn)
-			const timeB = parseTime(b.timeIn)
 
-			if (timeA === null && timeB === null) return 0
-			if (timeA === null) return 1
-			if (timeB === null) return -1
-			return timeB - timeA
+			console.log(response.data)
+
+			// table data
+			iclData.value = response.data.data.sort((a, b) => {
+				// 1️⃣ Status priority
+				const getStatusRank = (item) => {
+					const status = item.status ?? ''
+					return statusPriority[status] ?? 2
+				}
+
+				const statusA = getStatusRank(a)
+				const statusB = getStatusRank(b)
+
+				if (statusA !== statusB) {
+					return statusA - statusB   // Initial ↑ , Done ↓
+				}
+
+				// 2️⃣ Same status → sort by timeIn (latest first)
+				const parseTime = (t) => {
+					if (!t) return null
+					const [hours, minutes] = t.split(':').map(Number)
+					return hours * 60 + minutes
+				}
+
+				const timeA = parseTime(a.timeIn)
+				const timeB = parseTime(b.timeIn)
+
+				if (timeA === null && timeB === null) return 0
+				if (timeA === null) return 1
+				if (timeB === null) return -1
+
+				return timeB - timeA
 			})
 
+			// ✅ SAFE counter assignment
+			const apiCounter = response.data.counter || {}
+
+			counter.value.initial = apiCounter.initial ?? 0
+			counter.value.ongoing = apiCounter.ongoing ?? 0
+			counter.value.done    = apiCounter.done ?? 0
+
 			if ((currentPage.value - 1) * itemsPerPage >= iclData.value.length) {
-			currentPage.value = 1
+				currentPage.value = 1
 			}
+
 		} catch (error) {
 			console.error('Error fetching ICL data:', error)
+
+			// fallback reset (optional)
+			counter.value.initial = 0
+			counter.value.ongoing = 0
+			counter.value.done    = 0
 		}
 	}
+
 
 	// Computed paginated data
 	const paginatedData = computed(() => {
@@ -131,7 +178,7 @@
 		</div>
   
 		<!-- Header -->
-		<div class="max-w-10xl mx-auto bg-gradient-to-r from-violet-600 to-zinc-50 shadow-lg rounded-lg p-6 mb-8 flex items-center justify-between h-20 relative z-10">
+		<div class="max-w-10xl mx-auto bg-gradient-to-r from-violet-600 to-zinc-50 shadow-lg rounded-lg p-6 mb-2 flex items-center justify-between h-20 relative z-10">
 			<div class="flex flex-col text-left leading-tight">
 				<span class="text-xl font-bold text-white">{{ time }}</span>
 				<span class="text-sm text-white">{{ date }}</span>
@@ -142,6 +189,37 @@
 				<img :src="mislogo" alt="Logo" class="h-18 object-contain" />
 			</div>
 		</div>
+
+		<!-- Status Summary Box -->
+		<div class="max-w-10xl mx-auto bg-white shadow-md rounded-lg px-8 py-3 mb-8 flex items-center justify-center gap-16 h-14">
+	
+			<div class="flex items-center gap-2">
+				<span class="text-sm font-semibold text-gray-600">INITIAL</span>
+				<span class="text-lg font-bold text-yellow-600">
+					{{ counter.initial }}
+				</span>
+			</div>
+
+			<div class="h-6 w-px bg-gray-300"></div>
+
+			<div class="flex items-center gap-2">
+				<span class="text-sm font-semibold text-gray-600">ONGOING</span>
+				<span class="text-lg font-bold text-blue-600">
+					{{ counter.ongoing }}
+				</span>
+			</div>
+
+			<div class="h-6 w-px bg-gray-300"></div>
+
+			<div class="flex items-center gap-2">
+				<span class="text-sm font-semibold text-gray-600">DONE</span>
+				<span class="text-lg font-bold text-green-600">
+					{{ counter.done }}
+				</span>
+			</div>
+
+		</div>
+
   
 		<!-- Table Container -->
 		<div class="max-w-10xl mx-auto bg-fuchsia-50 shadow-lg rounded-lg p-6 overflow-hidden relative z-10">
@@ -152,10 +230,10 @@
 						<th class="px-4 py-2 border-b">MRN</th>
 						<th class="px-4 py-2 border-b">PROCEDURE</th>
 						<th class="px-4 py-2 border-b">CONSULTANT</th>
-						<th class="px-4 py-2 border-b">REG NO.</th>
 						<th class="px-4 py-2 border-b">LAB</th>
 						<th class="px-4 py-2 border-b">TIME IN</th>
 						<th class="px-4 py-2 border-b">STATUS</th>
+						<th class="px-4 py-2 border-b">REMARKS</th>
 						</tr>
 					</thead>
 	
@@ -168,7 +246,6 @@
 							<td class="px-4 py-2 border-b font-semibold text-xl">{{ item.mrn || '-' }}</td>
 							<td class="px-4 py-2 border-b text-xl">{{ item.initialProcedure || '-' }}</td>
 							<td class="px-4 py-2 border-b text-xl">{{ item.consultant || '-' }}</td>
-							<td class="px-4 py-2 border-b text-xl">{{ item.cathRegNo || '-' }}</td>
 							<td class="px-4 py-2 border-b text-xl">{{ item.lab || '-' }}</td>
 							<td class="px-4 py-2 border-b text-xl">{{ item.timeIn || '-' }}</td>
 							<td class="px-4 py-2 border-b text-xl">
@@ -188,6 +265,7 @@
 								</span>
 								<span v-else>-</span>
 							</td>
+							<td class="px-4 py-2 border-b text-xl">{{ item.overallRemarks || '-' }}</td>
 						</tr>
 						<tr v-if="paginatedData.length === 0">
 							<td colspan="8" class="px-4 py-2 border-b text-center">No data found</td>
