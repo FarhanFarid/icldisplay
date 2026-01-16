@@ -72,10 +72,7 @@ class DisplayController extends Controller
             foreach ($filtered as $item) {
 
                 // INITIAL
-                if (
-                    isset($item['status']) &&
-                    strtolower($item['status']) === 'initial'
-                ) {
+                if (isset($item['status']) && strtolower($item['status']) === 'initial' && empty($item['timeIn']) && empty($item['lab'])) {
                     $counter['initial']++;
                 }
 
