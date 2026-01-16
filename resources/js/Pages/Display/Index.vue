@@ -23,6 +23,20 @@
 		'done': 3
 	}
 
+	const getDisplayStatus = (item) => {
+		if (!item?.status) return null
+
+		// Only override Initial
+		if (
+			item.status.toLowerCase() === 'initial' &&
+			(item.timeIn || item.lab)
+		) {
+			return 'Ongoing'
+		}
+
+		return item.status
+	}
+
 	// Clock state
 	const time = ref('')
 	const date = ref('')
@@ -250,18 +264,21 @@
 							<td class="px-4 py-2 border-b text-xl">{{ item.timeIn || '-' }}</td>
 							<td class="px-4 py-2 border-b text-xl">
 								<span
-									v-if="item.status"
-									:class="[ 
-									'px-2 py-1 rounded-full text-dark text-sm font-semibold',
-									item.status === 'Initial'
-										? 'bg-yellow-500'
-										: item.status === 'Done'
-										? 'bg-green-500'
-										: item.status === 'Postpone'
-										? 'bg-red-500'
-										: 'bg-gray-400'
-									]">
-									{{ item.status }}
+									v-if="getDisplayStatus(item)"
+									:class="[
+										'px-2 py-1 rounded-full text-dark text-sm font-semibold',
+										getDisplayStatus(item) === 'Initial'
+											? 'bg-yellow-500'
+											: getDisplayStatus(item) === 'Ongoing'
+											? 'bg-blue-500'
+											: getDisplayStatus(item) === 'Done'
+											? 'bg-green-500'
+											: getDisplayStatus(item) === 'Postpone'
+											? 'bg-red-500'
+											: 'bg-gray-400'
+									]"
+								>
+									{{ getDisplayStatus(item) }}
 								</span>
 								<span v-else>-</span>
 							</td>

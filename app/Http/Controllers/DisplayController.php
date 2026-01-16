@@ -80,7 +80,7 @@ class DisplayController extends Controller
                 }
 
                 // ONGOING (has timeIn)
-                if (!empty($item['timeIn']) && strtolower($item['status']) === 'initial') {
+                if ((!empty($item['timeIn']) || !empty($item['lab'])) && strtolower($item['status']) === 'initial') {
                     $counter['ongoing']++;
                 }
             }
