@@ -54,7 +54,16 @@ class DisplayController extends Controller
              * 2. Filter API data by matching rowID
              */
             $filtered = array_filter($content, function ($item) use ($procedureIds) {
-                return isset($item['rowID']) && in_array($item['rowID'], $procedureIds);
+
+                if (!isset($item['rowID'], $item['status'])) {
+                    return false;
+                }
+            
+                $status = strtolower($item['status']);
+            
+                return
+                    in_array($item['rowID'], $procedureIds) &&
+                    in_array($status, ['initial', 'done']);
             });
 
             $filtered = array_values($filtered);
